@@ -94,42 +94,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ->execute([mb_substr($lastMsg['content'], 0, 40), $convId]);
         }
 
-        $api_key = "sk_liyugn5i_2wzZJk1SOdeFvj4WRDpkfegt"; // <-- Replace with real key
-        $api_url = "https://api.sarvam.ai/v1/chat/completions";
+        // ========== GROQ API CONFIGURATION ==========
+        $api_key = getenv('GROQ_API_KEY');
+        $api_url = "https://api.groq.com/openai/v1/chat/completions"; // ✅ Groq endpoint[reference:1]
+        $model = "openai/gpt-oss-120b";  // ✅ 131K context, 500+ tokens/sec[reference:2]
 
+        // --- Prepare the request data (exactly like OpenAI) ---
         $request_data = [
-            'model' => 'sarvam-105b',
-            'messages' => $input['messages'],
+            'model' => $model,
+            'messages' => $input['messages'],        // Your chat history
             'temperature' => 0.7,
-            'max_tokens' => 1500
+            'max_tokens' => 1500,
+            'stream' => false
         ];
 
+        // --- Send the request via cURL ---
         $ch = curl_init($api_url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'api-subscription-key: ' . $api_key,
+            'Authorization: Bearer ' . $api_key,     // ⚡ Correct auth method[reference:3]
             'Content-Type: application/json'
         ]);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($request_data));
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);  // Keep secure in production
+
+        // --- Handle the response ---
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curl_error = curl_error($ch);
         curl_close($ch);
 
-        // Log API call
-        $logStmt = $pdo->prepare("INSERT INTO api_logs (conversation_id, request_json, response_json, http_code, error) VALUES (?, ?, ?, ?, ?)");
-        $logStmt->execute([$convId, json_encode($request_data), $response, $http_code, $curl_error]);
-
+        // --- Parse the response (follows OpenAI format) ---
         if ($curl_error) {
             $reply = "cURL Error: " . $curl_error;
         } elseif ($http_code !== 200) {
-            $reply = "API பிழை (HTTP $http_code). தயவுசெய்து மீண்டும் முயற்சிக்கவும்.";
+            // Decode error details from Groq for better troubleshooting
+            $error_data = json_decode($response, true);
+            $error_msg = $error_data['error']['message'] ?? 'Unknown API error';
+            $reply = "API Error (HTTP $http_code): $error_msg";
         } else {
             $respData = json_decode($response, true);
-            $reply = $respData['choices'][0]['message']['content'] ?? "மன்னிக்கவும், பதில் கிடைக்கவில்லை.";
+            // ✅ Correct path for Groq/OpenAI response
+            $reply = $respData['choices'][0]['message']['content'] ?? "No response content.";
         }
+
+// Save $reply to your database and send back to user...
 
         // Save assistant answer
         $stmt = $pdo->prepare("INSERT INTO messages (conversation_id, role, content) VALUES (?, 'assistant', ?)");
