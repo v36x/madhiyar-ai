@@ -6,11 +6,19 @@
 session_start();
 date_default_timezone_set('Asia/Kolkata');
 
-// ---------- Database Setup (SQLite) ----------
-$dbFile = __DIR__ . '/madhiyar_pro.sqlite';
+// ---------- Database Setup (SQLite on Vercel /tmp) ----------
+$dbFile = '/tmp/madhiyar_pro.sqlite';
 $pdo = new PDO("sqlite:$dbFile");
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+// Create tables (same as before)
+$pdo->exec("CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT UNIQUE,
+    name TEXT DEFAULT 'Guest',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)");
 
 // Create tables
 $pdo->exec("CREATE TABLE IF NOT EXISTS users (
