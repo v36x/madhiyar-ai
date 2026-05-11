@@ -112,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'model' => $model,
             'messages' => $input['messages'],        // Your chat history
             'temperature' => 0.7,
-            'max_tokens' => 1500,
+            'max_tokens' => 5000,
             'stream' => false
         ];
 
